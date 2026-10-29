@@ -1,0 +1,7 @@
+# Setup / data-integrity stage
+numpy
+pillow
+imagehash
+pyyaml
+matplotlib
+scikit-learn

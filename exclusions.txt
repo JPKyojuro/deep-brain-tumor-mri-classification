@@ -1,0 +1,17 @@
+# Images excluded from training and evaluation. One file name per line; '#' starts a comment.
+# Reason: the same image is filed under two different class labels, so at least one label is
+# wrong and there is no way to tell which. Both images of each pair are excluded.
+# Confirmed by eye from the near-duplicate montages (outputs/setup/pairs_d5_page*.png), 2026-10-28.
+meningioma_train_00090.jpg
+pituitary_train_00270.jpg
+meningioma_train_00152.jpg
+pituitary_train_00330.jpg
+pituitary_train_00617.jpg
+meningioma_val_00098.jpg
+glioma_train_00480.jpg
+meningioma_train_00304.jpg
+
+# Unconfirmed: similar framing and rotation, but the lesion looks different at montage size.
+# Check at full resolution before deciding. Uncomment both lines to exclude.
+# glioma_train_01460.jpg
+# meningioma_train_00032.jpg

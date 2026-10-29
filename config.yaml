@@ -1,0 +1,54 @@
+# Central config for the BDNeuro-MRI brain tumor project.
+# Values mirror the written proposal; anything the proposal leaves open is marked TODO.
+
+seeds: [0, 1, 2]
+outputs_dir: outputs
+
+data:
+  root: data/Brain_Tumor_MRI_Dataset_Final   # Mendeley Data v9 (ImageFolder: <split>/<class>/*.jpg)
+  version: 9
+  doi: 10.17632/zwr4ntf94j.9
+  expected_counts: {train: 4160, val: 892, test: 889}   # raw counts, before exclusions
+  no_tumor_class: no_tumor
+  exclusions_file: exclusions.txt  # confirmed duplicate pairs with conflicting labels (8 images)
+  imbalance_ratio_threshold: 1.5   # max/min class count in train; above this, use class-weighted loss
+  dup_thresholds: [0, 5, 10]       # Hamming distances reported by the duplicate scan
+  external_root: data/external_brain_tumor_mri   # dataset [6], v1, DOI 10.17632/gt5t2dycvp.1 (not set up yet)
+
+# One shared preprocessing function (common.to_square_gray). Added after the format check showed
+# image size, mode and colour track the no_tumor class (see outputs/setup/metadata_by_class.json).
+preprocessing:
+  grayscale_first: true            # drops colour/RGBA cues (21 colour + 3 RGBA files, all no_tumor)
+  non_square: letterbox            # pad to square with black instead of stretching. TODO: team to confirm
+  resample: bicubic                # same filter for every image
+  replicate_to_3_channels: true    # for pretrained nets, after grayscale
+
+training:
+  input_size: 224
+  batch_size: 32
+  optimizer: adamw
+  weight_decay: null               # TODO: not specified in the proposal
+  normalization: imagenet_mean_std # for pretrained models; TODO decide for the from-scratch baseline
+  baseline:
+    lr: 1.0e-3
+    schedule: cosine
+    max_epochs: 30
+  pretrained:
+    stage1: {epochs: 5, lr: 1.0e-3, backbone_frozen: true, batchnorm_eval: true}
+    stage2: {max_epochs: 25, warmup_epochs: 1, peak_lr: 1.0e-4, schedule: cosine}
+  early_stopping:
+    metric: val_macro_f1
+    patience: 7
+    pretrained_stage2_only: true
+  augmentation:
+    rotation_deg: 10
+    horizontal_flip: true
+    vertical_flip: false
+    brightness_contrast: small      # TODO: pick concrete ranges
+    # Proposed, to hide format cues from the network. TODO: tune ranges on validation only.
+    aspect_jitter: {p: 0.3, range: [0.85, 1.15]}
+    random_downscale_blur: {p: 0.5, scale_range: [0.5, 1.0]}
+
+triage:
+  target_sensitivity: 0.98          # initial target, team to confirm
+  temperature_scaling: true         # fit on validation logits, then freeze

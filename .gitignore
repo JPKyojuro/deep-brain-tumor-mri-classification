@@ -1,0 +1,28 @@
+# Dataset and generated results (large, reproducible, or both)
+/data/*
+!/data/.gitkeep
+/outputs/
+
+# Model weights and training logs (add when the training stage starts)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+/runs/
+/lightning_logs/
+/wandb/
+events.out.tfevents.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Local clutter
+.DS_Store
+.idea/
+.vscode/
+.env
+*.zip

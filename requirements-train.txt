@@ -1,0 +1,7 @@
+# Training, evaluation, and demo stages (install after the integrity checks pass)
+-r requirements.txt
+torch
+torchvision
+timm
+scikit-learn
+gradio
