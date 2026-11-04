@@ -27,8 +27,15 @@ Pin v9: the SSRN abstract and the authors' GitHub repo still point to v7.
     python3 scripts/view_pairs.py          # side-by-side images of near-duplicate pairs, for review by eye
     python3 scripts/class_balance.py       # class counts, class weights, tumor-positive counts per split
     python3 scripts/metadata_by_class.py   # image mode / size / colour vs class (shortcut risk)
-    python3 scripts/build_manifest.py      # outputs/manifest.csv: metadata + intensity features, applies exclusions.txt
+    python3 scripts/build_manifest.py      # outputs/manifest.csv: metadata, whole-image and head-only intensity features, exclusions
+    python3 scripts/view_masks.py          # outlines of the head mask on random images: look before trusting the masked rows
     python3 scripts/shortcut_baseline.py   # models that never see anatomy; scored on validation only
+
+The baseline reports six feature families. `intensity` uses the whole image (including black
+padding and background); `masked` and `masked_norm` use only pixels inside the head mask, computed
+on the non-padded area so letterboxing cannot leak in; `geometry` is how much of the frame the head
+fills. A big drop from `intensity` to `masked` means the whole-image histogram was mostly reading
+padding and frame size. `masked_norm` stays high only if the signal is in the brain pixels themselves.
 
 Results go to `outputs/setup/` (and `outputs/manifest.csv`).
 
@@ -59,6 +66,8 @@ Results go to `outputs/setup/` (and `outputs/manifest.csv`).
     python3 scripts/shortcut_baseline.py --config /some/scratch/dir/config.yaml
 
 Drop `--shortcut` for a dataset with no planted shortcut (the baseline should hover near chance).
+Use `--shape-only` to plant a shortcut that exists only in image shape: `metadata` and `intensity`
+should reach AUC 1.0 while `geometry`, `masked` and `masked_norm` stay near 0.5.
 
 ## Open items (also marked TODO in config.yaml)
 
