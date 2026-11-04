@@ -33,7 +33,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
     ap.add_argument("--per-class", type=int, default=14)
-    ap.add_argument("--shortcut", action="store_true")
+    ap.add_argument("--shortcut", action="store_true",
+                    help="no-tumor differs in image shape AND intensity range")
+    ap.add_argument("--shape-only", action="store_true",
+                    help="no-tumor differs ONLY in image shape (non-square); same intensities. "
+                         "Raw whole-image intensity features should leak it through padding; "
+                         "masked features should not.")
     args = ap.parse_args()
 
     out = Path(args.out_dir).resolve()
@@ -49,10 +54,11 @@ def main():
         for c in CLASSES:
             d = data / split / c
             d.mkdir(parents=True)
-            odd = args.shortcut and c == "notumor"
-            size = (100, 130) if odd else (128, 128)
+            odd_shape = (args.shortcut or args.shape_only) and c == "notumor"
+            odd_int = args.shortcut and c == "notumor"
+            size = (100, 130) if odd_shape else (128, 128)
             for k in range(n):
-                img = Image.fromarray(blob(rng, odd)).resize(size, Image.BICUBIC).convert("L")
+                img = Image.fromarray(blob(rng, odd_int)).resize(size, Image.BICUBIC).convert("L")
                 img.save(d / f"{c}_{split}_{k:03d}.jpg", quality=95)
 
     src = data / "train" / "glioma" / "glioma_train_000.jpg"
@@ -78,7 +84,8 @@ def main():
     }
     with open(out / "config.yaml", "w") as f:
         yaml.safe_dump(cfg, f)
-    print("Synthetic dataset written to", out, "(shortcut planted)" if args.shortcut else "")
+    note = "(shape+intensity shortcut)" if args.shortcut else "(shape-only shortcut)" if args.shape_only else ""
+    print("Synthetic dataset written to", out, note)
 
 
 if __name__ == "__main__":
