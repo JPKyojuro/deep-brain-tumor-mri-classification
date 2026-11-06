@@ -39,6 +39,9 @@ def main():
                     help="no-tumor differs ONLY in image shape (non-square); same intensities. "
                          "Raw whole-image intensity features should leak it through padding; "
                          "masked features should not.")
+    ap.add_argument("--tumor-shape", action="store_true",
+                    help="meningioma and pituitary get different image shapes (tests the "
+                         "tumor-only three-class rows: metadata should separate them)")
     args = ap.parse_args()
 
     out = Path(args.out_dir).resolve()
@@ -57,6 +60,10 @@ def main():
             odd_shape = (args.shortcut or args.shape_only) and c == "notumor"
             odd_int = args.shortcut and c == "notumor"
             size = (100, 130) if odd_shape else (128, 128)
+            if args.tumor_shape and c == "meningioma":
+                size = (110, 128)
+            elif args.tumor_shape and c == "pituitary":
+                size = (128, 110)
             for k in range(n):
                 img = Image.fromarray(blob(rng, odd_int)).resize(size, Image.BICUBIC).convert("L")
                 img.save(d / f"{c}_{split}_{k:03d}.jpg", quality=95)
