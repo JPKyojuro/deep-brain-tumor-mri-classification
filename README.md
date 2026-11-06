@@ -29,6 +29,7 @@ Pin v9: the SSRN abstract and the authors' GitHub repo still point to v7.
     python3 scripts/metadata_by_class.py   # image mode / size / colour vs class (shortcut risk)
     python3 scripts/build_manifest.py      # outputs/manifest.csv: metadata, whole-image and head-only intensity features, exclusions
     python3 scripts/view_masks.py          # outlines of the head mask on random images: look before trusting the masked rows
+    python3 scripts/view_samples.py        # contact sheets of random raw no-tumor and tumor images: compare plane, sequence, borders
     python3 scripts/shortcut_baseline.py   # models that never see anatomy; scored on validation only
 
 The baseline reports six feature families. `intensity` uses the whole image (including black
@@ -36,6 +37,11 @@ padding and background); `masked` and `masked_norm` use only pixels inside the h
 on the non-padded area so letterboxing cannot leak in; `geometry` is how much of the frame the head
 fills. A big drop from `intensity` to `masked` means the whole-image histogram was mostly reading
 padding and frame size. `masked_norm` stays high only if the signal is in the brain pixels themselves.
+
+It prints three tables: four-class and binary results; triage (threshold for the 98% sensitivity
+target chosen by 5-fold CV on train, applied once to validation, with an optimistic best-case
+column); and a tumor-only three-class table (no-tumor removed) that shows whether format cues
+separate the tumor types. Specificity rests on ~118 validation images, so treat it as noisy.
 
 Results go to `outputs/setup/` (and `outputs/manifest.csv`).
 
@@ -66,7 +72,8 @@ Results go to `outputs/setup/` (and `outputs/manifest.csv`).
     python3 scripts/shortcut_baseline.py --config /some/scratch/dir/config.yaml
 
 Drop `--shortcut` for a dataset with no planted shortcut (the baseline should hover near chance).
-Use `--shape-only` to plant a shortcut that exists only in image shape: `metadata` and `intensity`
+Use `--tumor-shape` to give meningioma and pituitary different shapes (the tumor-only table's
+`metadata` row should reach 1.0). Use `--shape-only` to plant a shortcut that exists only in image shape: `metadata` and `intensity`
 should reach AUC 1.0 while `geometry`, `masked` and `masked_norm` stay near 0.5.
 
 ## Open items (also marked TODO in config.yaml)
