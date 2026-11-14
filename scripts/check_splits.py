@@ -18,6 +18,7 @@ from common import SPLITS, list_dataset, load_config
 
 
 def main():
+    # Loads in arguments from the command line, default config arg is config.yaml
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
     args = ap.parse_args()

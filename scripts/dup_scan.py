@@ -32,7 +32,8 @@ POPCOUNT = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
 NCC_MAX_DIST = 5       # compute pixel correlation only for pairs this close
 LIKELY_DUP_NCC = 0.98  # NCC at or above this: very likely the same image
 
-
+# Finds the hash of a given image based on the
+# bits that compose the image
 def md5_of(path):
     h = hashlib.md5()
     with open(path, "rb") as f:
@@ -40,7 +41,7 @@ def md5_of(path):
             h.update(chunk)
     return h.hexdigest()
 
-
+# Uses the 'fingerprint' of the image to find lookalikes
 def phash64(path):
     with Image.open(path) as im:
         h = imagehash.phash(im.convert("L"), hash_size=8)
