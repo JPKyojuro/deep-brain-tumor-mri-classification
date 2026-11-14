@@ -66,3 +66,89 @@ class SmallCNN(nn.Module):
         return self.head(self.features(x))
 
 
+@torch.no_grad()
+def predict(model, loader, device):
+    """Return (true labels, predicted labels) as numpy arrays."""
+    model.eval()
+    ys, ps = [], []
+    for x, y in loader:
+        ps.append(model(x.to(device)).argmax(1).cpu())
+        ys.append(y)
+    return torch.cat(ys).numpy(), torch.cat(ps).numpy()
+
+
+def main():
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--config", default="config.yaml")
+    cfg = load_config(pre.parse_known_args()[0].config)
+    tr = cfg["training"]
+
+    ap = argparse.ArgumentParser(parents=[pre])
+    ap.add_argument("--lr", type=float, default=tr["baseline"]["lr"])
+    ap.add_argument("--epochs", type=int, default=tr["baseline"]["max_epochs"])
+    ap.add_argument("--batch-size", type=int, default=tr["batch_size"])
+    ap.add_argument("--weight-decay", type=float, default=tr["weight_decay"] or 1e-4)
+    ap.add_argument("--patience", type=int, default=tr["early_stopping"]["patience"])
+    ap.add_argument("--input-size", type=int, default=tr["input_size"])
+    ap.add_argument("--width", type=int, default=32, help="channels in the first conv block")
+    ap.add_argument("--dropout", type=float, default=0.3)
+    ap.add_argument("--seed", type=int, default=cfg["seeds"][0])
+    ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--out", default=str(Path(cfg["outputs_dir"]) / "checkpoints" / "cnn.pt"))
+    args = ap.parse_args()
+
+    random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    train_ds = MRIDataset(cfg, "train", size=args.input_size, train=True)
+    val_ds = MRIDataset(cfg, "val", classes=train_ds.classes, size=args.input_size)
+    train_dl = DataLoader(train_ds, args.batch_size, shuffle=True, num_workers=args.workers)
+    val_dl = DataLoader(val_ds, args.batch_size, num_workers=args.workers)
+
+    # class-weighted loss only when train is imbalanced (threshold from config.yaml)
+    counts = np.bincount([y for _, y in train_ds.items], minlength=len(train_ds.classes))
+    weight = None
+    if counts.max() / counts.min() > cfg["data"]["imbalance_ratio_threshold"]:
+        weight = torch.tensor(counts.sum() / (len(counts) * counts), dtype=torch.float32).to(device)
+    loss_fn = nn.CrossEntropyLoss(weight=weight)
+
+    model = SmallCNN(len(train_ds.classes), args.width, args.dropout).to(device)
+    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
+
+    best, bad = -1.0, 0
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    print(f"{len(train_ds)} train / {len(val_ds)} val images, device={device}, classes={train_ds.classes}")
+
+    for epoch in range(1, args.epochs + 1):
+        model.train()
+        total = 0.0
+        for x, y in train_dl:
+            x, y = x.to(device), y.to(device)
+            opt.zero_grad()
+            loss = loss_fn(model(x), y)
+            loss.backward()
+            opt.step()
+            total += loss.item() * len(y)
+        sched.step()
+
+        y_true, y_pred = predict(model, val_dl, device)
+        f1 = f1_score(y_true, y_pred, average="macro")
+        acc = (y_true == y_pred).mean()
+        print(f"epoch {epoch:2d}  train loss {total / len(train_ds):.4f}  val acc {acc:.3f}  val macro-F1 {f1:.3f}")
+
+        if f1 > best:
+            best, bad = f1, 0
+            torch.save({"model_state": model.state_dict(), "classes": train_ds.classes,
+                        "args": vars(args), "epoch": epoch, "val_macro_f1": float(f1)}, args.out)
+        else:
+            bad += 1
+            if bad >= args.patience:
+                print(f"early stop (no val macro-F1 gain for {args.patience} epochs)")
+                break
+
+    print(f"best val macro-F1 {best:.3f} -> {args.out}")
+
+
+if __name__ == "__main__":
+    main()
