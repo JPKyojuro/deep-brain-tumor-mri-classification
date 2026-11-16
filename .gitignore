@@ -26,3 +26,6 @@ venv/
 .vscode/
 .env
 *.zip
+
+# Internal Records
+progress.md
