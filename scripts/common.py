@@ -14,6 +14,14 @@ SPLIT_ALIASES = {
 SPLITS = ("train", "val", "test")
 
 
+EXTERNAL_CLASS_MAP = {
+    "glioma_tumor": "glioma",
+    "meningioma_tumor": "meningioma",
+    "no_tumor": "no_tumor",
+    "pituitary_tumor": "pituitary",
+}
+
+
 def load_config(path="config.yaml"):
     with open(path) as f:
         return yaml.safe_load(f)
@@ -190,3 +198,27 @@ def list_dataset(root):
     if not records:
         raise SystemExit(f"No images found under {root}")
     return records
+
+def list_external(root):
+    """Return a sorted list of (folder, class_name, Path) for dataset [6].
+
+    folder is the original split folder in lowercase ('train' / 'test').
+    class_name is mapped to BDNeuro's names; an unknown class folder stops the run.
+    """
+    root = Path(root)
+    records = []
+    # Loops through train and test in the extended dataset
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        # Loops through the classes in the split
+        for cls_dir in sorted(p for p in folder.iterdir() if p.is_dir()):
+            # If class folder isn't mapped, raise error
+            if cls_dir.name not in EXTERNAL_CLASS_MAP:
+                raise SystemExit(f"Unmapped class folder: {cls_dir}")
+            # Loops through every image
+            for img in sorted(cls_dir.rglob("*")):
+                if img.is_file() and img.suffix.lower() in IMG_EXTS:
+                    records.append((folder.name.lower(), EXTERNAL_CLASS_MAP[cls_dir.name], img))
+    if not records:
+        raise SystemError(f"No images found under {root}")
+    return records
+            
