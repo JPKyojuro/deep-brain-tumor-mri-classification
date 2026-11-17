@@ -16,3 +16,28 @@ nb = len(bd)
 
 md5s = [md5_of(r[2]) for r in recs]
 hashes = np.array([phash64(r[2]) for r in recs], dtype=np.uint64)
+
+rows = [] # one row per BDNeuro <-> [6] pair at Hamming distance <= 5
+for i, j, d in near_pairs(hashes, 5):
+    # i < j always; keep only i in BDNeuro and j in [6]
+    if i >= nb or j < nb:
+        continue
+    rows.append({"ext": recs[j][2].name, "ext_folder": recs[j][0], "ext_cls": recs[j][1],
+                 "bd": recs[i][2].name, "bd_split": recs[i][0], "bd_cls": recs[i][1],
+                 "dist": d, "exact": int(md5s[i] == md5s[j]),
+                 "ncc": round(ncc(recs[i][2], recs[j][2]), 3)})
+
+out = Path(cfg["outputs_dir"]) / "setup" / "external_overlaps_pairs.csv"
+with open(out, 'w', newline="") as f:
+    w = csv.DictWriter(f, fieldnames=rows[0].keys())
+    w.writeheader()
+    w.writerows(rows)
+
+matched = {r['ext'] for r in rows if r['exact'] or r['ncc'] >= LIKELY_DUP_NCC}
+print(f"[6] images: {len(ex)}; with a BDNeuro match: {len(matched)}")
+
+# TODO 1: matches by [6] folder and BDNeuro split (train/val/test)
+# TODO 2: matched pairs whose class labels disagree
+# TODO 3: unmatched [6] images per class and folder (the residual set)
+# TODO 4: [6]-internal duplicate groups: span train and test? mixed labels?
+
