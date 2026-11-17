@@ -14,10 +14,13 @@ ex = list_external("data/external_brain_tumor_mri")     # (folder, cls, path)
 recs = bd + ex                                          # BDNeuro first, [6] after
 nb = len(bd)
 
+print("Finding exact copies...")
 md5s = [md5_of(r[2]) for r in recs]
+print("Collecting hashes...")
 hashes = np.array([phash64(r[2]) for r in recs], dtype=np.uint64)
 
 rows = [] # one row per BDNeuro <-> [6] pair at Hamming distance <= 5
+print("Finding near pairs...")
 for i, j, d in near_pairs(hashes, 5):
     # i < j always; keep only i in BDNeuro and j in [6]
     if i >= nb or j < nb:
