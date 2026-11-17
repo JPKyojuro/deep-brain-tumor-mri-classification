@@ -31,7 +31,7 @@ import numpy as np
 from PIL import Image
 
 from class_balance import NO_TUMOR_PATTERN
-from common import (head_mask, list_dataset, load_config, load_exclusions, to_square_gray,
+from common import (head_mask, list_dataset, load_config, list_external, load_exclusions, to_square_gray,
                     valid_box)
 from metadata_by_class import COLOR_TOL, size_bucket
 
@@ -46,11 +46,14 @@ def hist16(values, lo, hi):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
+    ap.add_argument("--external", help="path to dataset [6]; writes manifest_external.csv")
     args = ap.parse_args()
     cfg = load_config(args.config)
     size = cfg.get("training", {}).get("input_size", 224)
 
-    records = list_dataset(cfg["data"]["root"])
+    # Introduces external flag to switch to [6] dataset
+    records = list_external(args.external) if args.external else list_dataset(cfg["data"]["root"])
+
     classes = sorted({c for _, c, _ in records})
     no_tumor = cfg["data"].get("no_tumor_class")
     if no_tumor is None:
@@ -61,7 +64,8 @@ def main():
                          "set data.no_tumor_class in config.yaml.")
     label_of = {c: i for i, c in enumerate(classes)}
 
-    excluded_names = load_exclusions(cfg)
+    excluded_names = set() if args.external else load_exclusions(cfg)
+
     present = {p.name for _, _, p in records}
     missing = sorted(excluded_names - present)
     if missing:
@@ -76,7 +80,7 @@ def main():
               + [f"n_h{i:02d}" for i in range(N_BINS)])
     out_dir = Path(cfg["outputs_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "manifest.csv"
+    out_path = out_dir / ("manifest.csv" if not args.external else "manifest_external.csv")
 
     print(f"Reading {len(records)} images ...")
     n_excl = Counter()
