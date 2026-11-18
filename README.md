@@ -83,3 +83,4 @@ should reach AUC 1.0 while `geometry`, `masked` and `masked_norm` stay near 0.5.
 - Concrete brightness/contrast and aspect/blur augmentation ranges.
 - Which model and seed(s) the bootstrap CI covers.
 - Two unconfirmed possible duplicate pairs at the bottom of `exclusions.txt`.
+- External set: confirm the residual definition (no detected BDNeuro match, one copy per duplicate group), check the 0.90-0.98 NCC grey zone, and write `outputs/setup/external_residual.txt`
