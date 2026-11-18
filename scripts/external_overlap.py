@@ -99,3 +99,13 @@ output_path = Path(cfg['outputs_dir']) / "setup" / "external_residual.txt"
 keep['path'].to_csv(output_path, index=False, header=False)
 
 print(len(keep), keep['cls'].value_counts().to_dict())
+
+# 3 of the 4 disagreeing pairs involve an excluded BDNeuro image
+
+# This isolates the 4th pair
+K = bad[~bad["bd"].isin(load_exclusions(cfg))][["ext_path", "bd", "bd_split", "bd_cls", "ext_cls"]]
+print(K.to_string())
+strict = keep[keep['best_ncc'].isna() | (keep['best_ncc'] < 0.90)]
+print(len(strict), strict['cls'].value_counts().to_dict())
+strict['path'].to_csv(Path(cfg['outputs_dir']) / 'setup' / 'external_residual_strict.txt',
+                      index=False, header=False)
