@@ -3,10 +3,12 @@ import csv
 from pathlib import Path
 
 import numpy as np
+import sys
 
 from common import load_config
 from shortcut_baseline import (FAMILIES, fit_weighted, oof_p_tumor, p_tumor_of,
                                sens_spec, threshold_for_sens, vec)
+
 
 cfg = load_config()
 target = cfg.get("triage", {}).get("target_sensitivity", 0.98)
@@ -32,7 +34,8 @@ def arrays(rows, fam):
 bd = [r for r in read("manifest.csv") if r["excluded"] == "0"]
 train = [r for r in bd if r["split"] == "train"]
 val = [r for r in bd if r["split"] == "val"]          # BDNeuro test stays sealed
-keep = set((out / "setup" / "external_residual.txt").read_text().splitlines())
+list_name = sys.argv[1] if len(sys.argv) > 1 else "external_residual.txt"
+keep = set((out / "setup" / list_name).read_text().splitlines())
 ext = [r for r in read("manifest_external.csv") if r["path"] in keep]
 print(len(ext), "residual images")
 
@@ -55,3 +58,4 @@ for fam in FAMILIES:
         sens, spec = sens_spec(p, yb, t)
         # TODO: binary AUC with boot_ci, four-class accuracy, tumor-only three-class accuracy
         print(f"{fam:<12}{name:<14}sens {sens:.3f}  spec {spec:.3f}")
+
