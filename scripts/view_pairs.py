@@ -26,10 +26,12 @@ def main():
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--max-dist", type=int, default=5)
     ap.add_argument("--per-page", type=int, default=6)
+    ap.add_argument("--csv", default="dup_scan_pairs.csv")
+    ap.add_argument("--prefix", default="pairs")
     args = ap.parse_args()
     cfg = load_config(args.config)
     out = Path(cfg["outputs_dir"]) / "setup"
-    csv_path = out / "dup_scan_pairs.csv"
+    csv_path = out / args.csv
     if not csv_path.exists():
         raise SystemExit(f"{csv_path} not found. Run scripts/dup_scan.py first.")
 
@@ -56,7 +58,7 @@ def main():
                 )
                 ax.axis("off")
         fig.tight_layout()
-        dest = out / f"pairs_d{args.max_dist}_page{k}.png"
+        dest = out / f"{args.prefix}_d{args.max_dist}_page{k}.png"
         fig.savefig(dest, dpi=130)
         plt.close(fig)
         print("Wrote", dest)
