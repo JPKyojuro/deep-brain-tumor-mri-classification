@@ -104,7 +104,10 @@ print(len(keep), keep['cls'].value_counts().to_dict())
 
 # This isolates the 4th pair
 K = bad[~bad["bd"].isin(load_exclusions(cfg))][["ext_path", "bd", "bd_split", "bd_cls", "ext_cls"]]
+print("Fourth disagreeing pair, not excluded from BDNeuro:")
 print(K.to_string())
+
+print("Stricter ncc check")
 strict = keep[keep['best_ncc'].isna() | (keep['best_ncc'] < 0.90)]
 print(len(strict), strict['cls'].value_counts().to_dict())
 strict['path'].to_csv(Path(cfg['outputs_dir']) / 'setup' / 'external_residual_strict.txt',
