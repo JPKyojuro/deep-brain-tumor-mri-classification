@@ -81,3 +81,12 @@ from common import load_exclusions
 print(bad[["ext_path", "ext_cls", "bd", "bd_cls", "bd_split", "ncc"]])
 print(bad["bd"].isin(load_exclusions(cfg)).sum(), "of", len(bad), "involve an excluded image")
 
+# Finding how many images exist in the grey zone ncc (0.9-0.98)
+# Are these duplicates exact copies, making a pool of copied images
+# or are they just very, very similar
+
+best = df.groupby("ext_path")["ncc"].max()
+ex_df["best_ncc"] = ex_df["path"].map(best)
+res = ex_df[~ex_df["matched"]]
+print(res["best_ncc"].isna().sum(), "residual images with no hash-close BDNeuro image")
+print(((res["best_ncc"] >= 0.9) & (res["best_ncc"] < 0.98)).sum(), "in the 0.90-0.98 grey zone")
