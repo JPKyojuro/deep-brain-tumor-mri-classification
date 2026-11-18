@@ -25,7 +25,8 @@ for i, j, d in near_pairs(hashes, 5):
     # i < j always; keep only i in BDNeuro and j in [6]
     if i >= nb or j < nb:
         continue
-    rows.append({"ext": recs[j][2].name, "ext_folder": recs[j][0], "ext_cls": recs[j][1],
+    rows.append({"ext": recs[j][2].name, "ext_path": str(recs[j][2]), 
+                 "ext_folder": recs[j][0], "ext_cls": recs[j][1],
                  "bd": recs[i][2].name, "bd_split": recs[i][0], "bd_cls": recs[i][1],
                  "dist": d, "exact": int(md5s[i] == md5s[j]),
                  "ncc": round(ncc(recs[i][2], recs[j][2]), 3)})
@@ -36,11 +37,42 @@ with open(out, 'w', newline="") as f:
     w.writeheader()
     w.writerows(rows)
 
-matched = {r['ext'] for r in rows if r['exact'] or r['ncc'] >= LIKELY_DUP_NCC}
+matched = {r['ext_path'] for r in rows if r['exact'] or r['ncc'] >= LIKELY_DUP_NCC}
 print(f"[6] images: {len(ex)}; with a BDNeuro match: {len(matched)}")
 
-# TODO 1: matches by [6] folder and BDNeuro split (train/val/test)
-# TODO 2: matched pairs whose class labels disagree
-# TODO 3: unmatched [6] images per class and folder (the residual set)
-# TODO 4: [6]-internal duplicate groups: span train and test? mixed labels?
+
+import pandas as pd
+
+df = pd.DataFrame(rows)
+hits = df[(df['exact'] == 1) | (df['ncc'] >= LIKELY_DUP_NCC)]
+
+# one row per [6] image; md5s[nb:] lines up with ex because recs = bd + ex
+ex_df = pd.DataFrame({"path": [str(r[2]) for r in ex], 
+                      "folder": [r[0] for r in ex],
+                      "cls": [r[1] for r in ex], "md5": md5s[nb:]})
+
+# matches by [6] folder and BDNeuro split (train/val/test)
+print(pd.crosstab(hits['ext_folder'], hits['bd_split']))
+
+# matched pairs whose labels disagree
+bad = hits[hits['ext_cls'] != hits['bd_cls']]
+print(len(bad), "of", len(hits), "matched pairs disagree on class")
+print(pd.crosstab(bad['ext_cls'], bad['bd_cls'])) # which class pairs get confused
+
+# unmatched [6] images per class and folder (the residual set)
+
+ex_df['matched'] = ex_df['path'].isin(set(hits['ext_path']))
+print(pd.crosstab([ex_df['folder'], ex_df['cls']], ex_df['matched']))
+
+
+# [6]-internal duplicate groups
+g = ex_df.groupby("md5").agg(n=("path", "size"), folders=("folder", "nunique"),
+                             classes=("cls", "nunique"))
+
+d = g[g['n'] > 1]
+print(len(d), "duplicate groups;", (d["folders"] > 1).sum(), "span train and test;",
+      (d["classes"] > 1).sum(), "have mixed labels")
+print("images beyond the first copy:", (d["n"] - 1).sum())
+print("file names reused:", ex_df["path"].map(lambda p: Path(p).name).duplicated().sum())
+
 
