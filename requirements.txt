@@ -1,5 +1,6 @@
 # Setup / data-integrity stage
 numpy
+pandas
 pillow
 imagehash
 pyyaml
