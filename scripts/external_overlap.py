@@ -90,3 +90,12 @@ ex_df["best_ncc"] = ex_df["path"].map(best)
 res = ex_df[~ex_df["matched"]]
 print(res["best_ncc"].isna().sum(), "residual images with no hash-close BDNeuro image")
 print(((res["best_ncc"] >= 0.9) & (res["best_ncc"] < 0.98)).sum(), "in the 0.90-0.98 grey zone")
+
+# Matched images are already out, and no group has mixed labels, 
+# so the only cleanup left is one copy per duplicate group
+
+keep = res.drop_duplicates('md5')
+output_path = Path(cfg['outputs_dir']) / "setup" / "external_residual.txt" 
+keep['path'].to_csv(output_path, index=False, header=False)
+
+print(len(keep), keep['cls'].value_counts().to_dict())
