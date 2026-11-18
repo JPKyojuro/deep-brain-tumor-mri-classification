@@ -76,3 +76,8 @@ print("images beyond the first copy:", (d["n"] - 1).sum())
 print("file names reused:", ex_df["path"].map(lambda p: Path(p).name).duplicated().sum())
 
 
+# Checking whether the overlaps come from the prior overlaps previously found
+from common import load_exclusions
+print(bad[["ext_path", "ext_cls", "bd", "bd_cls", "bd_split", "ncc"]])
+print(bad["bd"].isin(load_exclusions(cfg)).sum(), "of", len(bad), "involve an excluded image")
+
