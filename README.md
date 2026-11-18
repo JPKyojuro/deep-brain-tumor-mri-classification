@@ -36,7 +36,11 @@ its original `train/` and `Test/` folders (class folders `glioma_tumor`, `mening
     python3 scripts/view_masks.py          # outlines of the head mask on random images: look before trusting the masked rows
     python3 scripts/view_samples.py        # contact sheets of random raw no-tumor and tumor images: compare plane, sequence, borders
     python3 scripts/shortcut_baseline.py   # models that never see anatomy; scored on validation only
+    python3 scripts/build_manifest.py --external data/external_brain_tumor_mri     # manifest_external.csv, with flags 
     python3 scripts/external_overlap.py    # BDNeuro vs [6]: exact and near-duplicate matches (run before any external scoring)
+    python3 scripts/grey_pairs.py          # samples grey-zone pairs (NCC 0.90-0.98) for a visual check
+    python3 scripts/view_pairs.py --csv grey_pairs.csv --prefix grey --per-page 6
+    python3 scripts/external_baseline.py external_residual_strict.txt   # train on BDNeuro, score [6] (or external_residual.txt)
 
 The baseline reports six feature families. `intensity` uses the whole image (including black
 padding and background); `masked` and `masked_norm` use only pixels inside the head mask, computed
@@ -67,9 +71,16 @@ Results go to `outputs/setup/` (and `outputs/manifest.csv`).
  
 - 2,363 of [6]'s 3,264 images (72%) match a BDNeuro image (exact hash, or perceptual hash plus pixel
   correlation >= 0.98), across all three BDNeuro splits. So [6] is not an independent test set.
-- The residual (no detected match) is 901 images: glioma 324, meningioma 199, no_tumor 98,
-  pituitary 280. It is a sanity check for image-level overlap, not a patient-independent test, and its
-  no_tumor count is small, so triage specificity on it needs a wide interval.
+- Two external sets: the residual (no match at NCC >= 0.98, one copy per duplicate group) has 836
+  images, and the strict set (no hash-close BDNeuro image, or best NCC < 0.90) has 570, of which 46
+  are no_tumor. A visual check of 12 grey-zone pairs found copies with small geometric or intensity
+  changes, so the strict set is primary. Neither is a patient-independent test, and no_tumor counts are
+  small, so triage specificity needs a wide interval.
+- The no-anatomy baseline, trained on BDNeuro, still separates tumor from no-tumor on both sets
+  (strict set, masked-pixel features: sensitivity 0.990, specificity 0.848), so the cues are shared
+  across the two datasets. The size cue is present in [6] too. Full tables are in `progress.md`.
+- One matched pair with conflicting labels is the same image under two labels (`meningioma_train_00040.jpg`
+  vs a [6] glioma file); the BDNeuro copy is to be added to `exclusions.txt`.
 - [6] has its own leakage: 64 duplicate groups span its train and Test folders, and 392 file names
   are reused, so key every [6] record on the full path.
 - Image size tracks the label in [6] as well (no_tumor is almost never 512x512).
@@ -101,4 +112,6 @@ should reach AUC 1.0 while `geometry`, `masked` and `masked_norm` stay near 0.5.
 - Concrete brightness/contrast and aspect/blur augmentation ranges.
 - Which model and seed(s) the bootstrap CI covers.
 - Two unconfirmed possible duplicate pairs at the bottom of `exclusions.txt`.
-- External set: confirm the residual definition (no detected BDNeuro match, one copy per duplicate group), check the 0.90-0.98 NCC grey zone, and write `outputs/setup/external_residual.txt`
+- Add `meningioma_train_00040.jpg` to `exclusions.txt`, rebuild both manifests and rerun both baselines.
+- Independent visual read of the 12 grey-zone pairs.
+- Verify the source of [6] on its Mendeley page.
