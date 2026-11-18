@@ -11,6 +11,8 @@ meningioma_val_00098.jpg
 glioma_train_00480.jpg
 meningioma_train_00304.jpg
 
+meningioma_train_00040.jpg   # identical to [6] Test/glioma_tumor/image(48).jpg, which is labelled glioma
+
 # Unconfirmed: similar framing and rotation, but the lesion looks different at montage size.
 # Check at full resolution before deciding. Uncomment both lines to exclude.
 # glioma_train_01460.jpg
