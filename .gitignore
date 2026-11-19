@@ -12,7 +12,6 @@
 /lightning_logs/
 /wandb/
 events.out.tfevents.*
-scripts/test.py
 
 # Python
 __pycache__/
