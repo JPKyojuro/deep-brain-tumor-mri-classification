@@ -219,6 +219,6 @@ def list_external(root):
                 if img.is_file() and img.suffix.lower() in IMG_EXTS:
                     records.append((folder.name.lower(), EXTERNAL_CLASS_MAP[cls_dir.name], img))
     if not records:
-        raise SystemError(f"No images found under {root}")
+        raise SystemExit(f"No images found under {root}")
     return records
             
