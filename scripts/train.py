@@ -112,7 +112,7 @@ def predict(model, loader, device):
     model.eval()
     ys, logits = [], []
     for x, y in loader:
-        logits.append(model(x.to(device)).argmax(1).cpu())
+        logits.append(model(x.to(device)).cpu())
         ys.append(y)
     return torch.cat(ys).numpy(), torch.cat(logits).numpy()
 
