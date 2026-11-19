@@ -1,13 +1,17 @@
 """Train a small CNN on BDNeuro-MRI and save the best checkpoint.
 
 Usage (from the project root):
-    python3 scripts/train.py
-    python3 scripts/train.py --lr 3e-4 --epochs 40 --width 48 --dropout 0.5
+    python3 scripts/train.py                      # seed 0, no D8 augmentation
+    python3 scripts/train.py --d8                 # same, plus the D8 format-cue augmentation
+    python3 scripts/train.py --seed 1 --lr 3e-4 --width 48
 
 Any flag you leave out falls back to config.yaml (or the default below).
 Model selection uses validation macro-F1; the test split is never touched here.
+Besides the checkpoint, the best epoch's per-image validation logits are saved
+(<out>_val_preds.csv) so D14/D15 and error comparisons with the baseline can be done later.
 """
 import argparse
+import csv
 import random
 from pathlib import Path
 
@@ -20,6 +24,24 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms as T
 
 from common import list_dataset, load_config, load_exclusions, to_square_gray
+
+# D8 ranges: TODO, tune on validation only. These are placeholders
+ASPECT_RATIO = (0.8, 1.25)      # aspect jitter (RandomResizedCrop ratio)
+CROP_SCALE = (0.85, 1.0)        # fraction of the image kept by that crop
+DOWNSCALE = (0.4, 1.0)          # random downscale factor before resizing back up
+BLUR_SIGMA = (0.1, 1.5)         # Gaussian blur strength
+
+class RandomDownscale:
+    # Shrink by a random factor, then resize back: makes sharpness/resolution a weaker cue.
+
+    def __init__(self, size, factor):
+        self.size, self.factor = size, factor
+
+    def __call__(self, img):
+        f = random.uniform(*self.factor)
+        small = max(8, int(self.size * f))
+        return img.resize((small, small), 
+                          Image.BICUBIC).resize((self.size, self.size), Image.BICUBIC)
 
 
 class MRIDataset(Dataset):
