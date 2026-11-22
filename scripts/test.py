@@ -3,6 +3,7 @@
 Usage (from the project root):
     python3 scripts/test.py --ckpt outputs/checkpoints/cnn_seed0.pt                 # val: dry run
     python3 scripts/test.py --ckpt outputs/checkpoints/cnn_seed{0,1,2}.pt --split test --final
+    python3 scripts/test.py --ckpt outputs/checkpoints/cnn_seed0.pt --external external_residual_strict.txt
 
 The test split stays sealed (D9): it is only read with --split test --final.
 For each checkpoint: temperature scaling and the 98%-sensitivity triage threshold are fit on
@@ -10,7 +11,6 @@ VALIDATION, then applied to the chosen split. With several checkpoints, the boot
 images and averages the metric over checkpoints inside each resample (D14); the spread across
 checkpoints is reported separately.
 """
-
 import argparse
 import csv
 from pathlib import Path
@@ -21,12 +21,13 @@ import torch.nn.functional as F
 from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 from torch.utils.data import DataLoader
 
-from common import load_config
+from common import EXTERNAL_CLASS_MAP, load_config
 from train import MRIDataset, SmallCNN, predict
 
 NO_TUMOR = "no_tumor"
 TARGET_SENS = 0.98
 KEYS = ["acc", "f1", "sens", "spec"]
+
 
 def fit_temperature(logits, y):
     # Single temperature T minimising NLL on (validation) logits.
@@ -42,6 +43,7 @@ def fit_temperature(logits, y):
 
     opt.step(closure)
     return log_t.exp().item()
+
 
 def ece(p, event, bins=10):
     # Expected calibration error:
@@ -63,33 +65,44 @@ def scores(y, pred, score, thr, nt):
     return np.array([(y == pred).mean(), f1_score(y, pred, average="macro"), 
                      flag[pos].mean(), (~flag[~pos]).mean()])
 
-def evaluate(cfg, ckpt_path, split, device, workers):
+
+def ext_items(list_file, classes):
+    # (Path, label) per line of an external list file: full paths, class = parent folder name.
+    p = Path(list_file)
+    if not p.exists():
+        p = Path("outputs/setup") / p  # where external_overlap.py writes the lists
+    items = []
+    for line in p.read_text().splitlines():
+        if line.strip():
+            path = Path(line.strip().replace("\\", "/"))
+            items.append((path, classes.index(EXTERNAL_CLASS_MAP[path.parent.name])))
+    return items
+
+
+def evaluate(cfg, ckpt_path, split, device, workers, ext=None):
     ck = torch.load(ckpt_path, map_location=device)
-    a, classes = ck['args'], ck['classes']
-    model = SmallCNN(len(classes), a['width'], a['dropout']).to(device)
-    model.load_state_dict(ck['model_state'])
+    a, classes = ck["args"], ck["classes"]
+    model = SmallCNN(len(classes), a["width"], a["dropout"]).to(device)
+    model.load_state_dict(ck["model_state"])
 
     out = {}
-    for s in {"val", split}:    # val is always needed for calibration
-        ds = MRIDataset(cfg, s, classes=classes, size=a['input_size'], norm=ck['norm'])
-        out[s] = (ds, *predict(model, DataLoader(ds, a['batch_size'], 
-                                                 num_workers=workers), device))
+    for s in {"val", split}:  # val is always needed for calibration
+        ds = MRIDataset(cfg, "val" if s == "external" else s, classes=classes,
+                        size=a["input_size"], norm=ck["norm"])
+        if s == "external":  # same preprocessing as val, different file list
+            ds.items = ext_items(ext, classes)
+        out[s] = (ds, *predict(model, DataLoader(ds, a["batch_size"], num_workers=workers), device))
 
     nt = classes.index(NO_TUMOR)
-    _, yv, zv = out['val']
+    _, yv, zv = out["val"]
     T = fit_temperature(zv, yv)
-    # P(tumor) on val
-    sv = 1 - F.softmax(torch.tensor(zv) / T, dim=1).numpy()[:, nt]
-    # threshold on val
-    thr = float(np.quantile(sv[yv != nt], 1 - TARGET_SENS))
+    sv = 1 - F.softmax(torch.tensor(zv) / T, dim=1).numpy()[:, nt]   # P(tumor) on val
+    thr = float(np.quantile(sv[yv != nt], 1 - TARGET_SENS))          # threshold on val
 
     ds, y, z = out[split]
     prob = F.softmax(torch.tensor(z) / T, dim=1).numpy()
-    return dict(ds=ds, classes=classes, nt=nt, y=y, prob=prob,
-                pred=prob.argmax(1), score=1 - prob[:, nt], T=T, thr=thr,
-                epoch=ck['epoch'])
-
-
+    return dict(ds=ds, classes=classes, nt=nt, y=y, prob=prob, pred=prob.argmax(1),
+                score=1 - prob[:, nt], T=T, thr=thr, epoch=ck["epoch"])
 
 
 def main():
@@ -98,18 +111,21 @@ def main():
     ap.add_argument("--ckpt", nargs="+", required=True)
     ap.add_argument("--split", choices=["val", "test"], default="val")
     ap.add_argument("--final", action="store_true", help="required to touch the test split")
+    ap.add_argument("--external", help="list file of dataset [6] paths (e.g. external_residual_strict.txt)")
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--workers", type=int, default=2)
     args = ap.parse_args()
+    if args.external:
+        args.split = "external"
+    tag = Path(args.external).stem if args.external else args.split
     if args.split == "test" and not args.final:
-        raise SystemExit("Test split is sealed (D9). " \
-        "Pass --final only for the final evaluation")
+        raise SystemExit("Test split is sealed (D9). Pass --final only for the final evaluation.")
 
     cfg = load_config(args.config)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     runs = []
     for path in args.ckpt:
-        R = evaluate(cfg, path, args.split, device, args.workers)
+        R = evaluate(cfg, path, args.split, device, args.workers, args.external)
         y, nt = R["y"], R["nt"]
         s = scores(y, R["pred"], R["score"], R["thr"], nt)
         conf = R["prob"].max(1)
@@ -121,7 +137,7 @@ def main():
         print(f"  confusion (rows = true, cols = pred; {R['classes']}):")
         print(confusion_matrix(y, R["pred"]))
 
-        out_csv = Path(cfg["outputs_dir"]) / "eval" / f"{args.split}_{Path(path).stem}_preds.csv"
+        out_csv = Path(cfg["outputs_dir"]) / "eval" / f"{tag}_{Path(path).stem}_preds.csv"
         out_csv.parent.mkdir(parents=True, exist_ok=True)
         with open(out_csv, "w", newline="") as f:
             w = csv.writer(f)
@@ -141,11 +157,11 @@ def main():
                              for R in runs], axis=0))
     lo, hi = np.percentile(boot, [2.5, 97.5], axis=0)
     per_run = np.array([scores(y, R["pred"], R["score"], R["thr"], nt) for R in runs])
-    print(f"\n{args.split} summary over {len(runs)} checkpoint(s), 95% bootstrap CI over images:")
+    print(f"\n{tag} summary over {len(runs)} checkpoint(s), {n} images ({(y == nt).sum()} no_tumor), "
+          "95% bootstrap CI over images:")
     for k, name in enumerate(KEYS):
         print(f"  {name:5s} {per_run[:, k].mean():.3f}  [{lo[k]:.3f}, {hi[k]:.3f}]"
               f"  seed SD {per_run[:, k].std(ddof=1) if len(runs) > 1 else float('nan'):.3f}")
-
 
 
 if __name__ == "__main__":
