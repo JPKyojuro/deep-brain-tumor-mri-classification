@@ -8,6 +8,6 @@ matplotlib
 scikit-learn
 scipy
 # Training, evaluation, and demo stages
-sklearn
+scikit-learn
 torch
 torchvision
