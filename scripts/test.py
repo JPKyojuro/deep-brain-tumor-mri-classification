@@ -83,7 +83,7 @@ def evaluate(cfg, ckpt_path, split, device, workers):
     # threshold on val
     thr = float(np.quantile(sv[yv != nt], 1 - TARGET_SENS))
 
-    ds, y, z = out['split']
+    ds, y, z = out[split]
     prob = F.softmax(torch.tensor(z) / T, dim=1).numpy()
     return dict(ds=ds, classes=classes, nt=nt, y=y, prob=prob,
                 pred=prob.argmax(1), score=1 - prob[:, nt], T=T, thr=thr,
