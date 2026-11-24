@@ -175,6 +175,9 @@ def main():
     print(f"seed={args.seed} d8={args.d8} lr={args.lr} wd={args.weight_decay} "
           f"norm=({norm[0]:.4f}, {norm[1]:.4f}) class weights={None if weight is None else weight.tolist()}")
 
+    log = Path(args.out).with_suffix(".log.csv")
+    log.write_text("epoch,train_loss,val_acc,val_f1\n")
+
     for epoch in range(1, args.epochs + 1):
         model.train()
         total = 0.0
@@ -192,6 +195,8 @@ def main():
         f1 = f1_score(y_true, y_pred, average="macro")
         acc = (y_true == y_pred).mean()
         print(f"epoch {epoch:2d}  train loss {total / len(train_ds):.4f}  val acc {acc:.3f}  val macro-F1 {f1:.3f}")
+        with open(log, "a") as f:
+            f.write(f"{epoch},{total / len(train_ds):.4f},{acc:.4f},{f1:.4f}\n")
 
         if f1 > best:
             best, bad = f1, 0
