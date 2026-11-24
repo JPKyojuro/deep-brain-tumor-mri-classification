@@ -64,6 +64,8 @@ class MRIDataset(Dataset):
                           RandomDownscale(size, DOWNSCALE),
                           T.GaussianBlur(55, sigma=BLUR_SIGMA)]
         steps += [T.ToTensor()] 
+        if norm:  # (mean, std) from the training images, computed in main()
+            steps += [T.Normalize(*norm)]
         self.tf = T.Compose(steps)
 
     def __len__(self):
