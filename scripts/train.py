@@ -53,6 +53,7 @@ class MRIDataset(Dataset):
                 if r[0] == split and r[2].name not in skip]
         self.classes = classes or sorted({c for _, c, _ in recs})
         self.items = [(p, self.classes.index(c)) for _, c, p in recs]
+        self.imgs = [to_square_gray(Image.open(p), size) for p, _ in self.items]
         self.size = size
         steps = []
         if train:  
@@ -73,7 +74,7 @@ class MRIDataset(Dataset):
 
     def __getitem__(self, i):
         path, label = self.items[i]
-        img = to_square_gray(Image.open(path), self.size)
+        img = self.imgs[i]
         return self.tf(img), label
 
 def train_stats(cfg, size, workers):
