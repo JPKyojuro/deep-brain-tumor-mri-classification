@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
-from PIL import Image
+from PIL import Image, ImageFilter
 from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms as T
@@ -43,6 +43,15 @@ class RandomDownscale:
         return img.resize((small, small), 
                           Image.BICUBIC).resize((self.size, self.size), Image.BICUBIC)
 
+class RandomBlur:
+    # PIL Gaussian Blur with a random sigma (much faster than T.GaussianBlur on PIL Images).
+
+    def __init__(self, sigma):
+        self.sigma = sigma
+
+    def __call__(self, img):
+        return img.filter(ImageFilter.GaussianBlur(random.uniform(*self.sigma)))
+
 
 class MRIDataset(Dataset):
 
@@ -63,7 +72,7 @@ class MRIDataset(Dataset):
             if d8:
                 steps += [T.RandomResizedCrop(size, scale=CROP_SCALE, ratio=ASPECT_RATIO),
                           RandomDownscale(size, DOWNSCALE),
-                          T.GaussianBlur(55, sigma=BLUR_SIGMA)]
+                          RandomBlur(BLUR_SIGMA)]
         steps += [T.ToTensor()] 
         if norm:  # (mean, std) from the training images, computed in main()
             steps += [T.Normalize(*norm)]
@@ -73,7 +82,7 @@ class MRIDataset(Dataset):
         return len(self.items)
 
     def __getitem__(self, i):
-        path, label = self.items[i]
+        _, label = self.items[i]
         img = self.imgs[i]
         return self.tf(img), label
 
