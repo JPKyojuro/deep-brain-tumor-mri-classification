@@ -29,6 +29,13 @@ def main():
 
     cfg = load_config()
     ds = MRIDataset(cfg, "train", size=224, train=True, d8=args.d8, norm=NORM)
+    x = to_square_gray(Image.open(ds.items[0][0]), 224)
+    for tf in ds.tf.transforms:
+        t = time.perf_counter()
+        for _ in range(30):
+            y = tf(x)
+        print(type(tf).__name__, f"{(time.perf_counter() - t) / 30 * 1000:.1f} ms")
+        x = y
     batches = len(ds) / BATCH
     print(f"{len(ds)} train images, {batches:.0f} batches/epoch, cpu cores={os.cpu_count()}, "
           f"torch threads={torch.get_num_threads()}")
